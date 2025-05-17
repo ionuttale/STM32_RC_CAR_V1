@@ -1,0 +1,7 @@
+../Core/Src/nrf24_rx.c:14:13:NRF24_CE_HIGH	8	static
+../Core/Src/nrf24_rx.c:15:13:NRF24_CE_LOW	8	static
+../Core/Src/nrf24_rx.c:16:13:NRF24_CSN_HIGH	8	static
+../Core/Src/nrf24_rx.c:17:13:NRF24_CSN_LOW	8	static
+../Core/Src/nrf24_rx.c:19:13:NRF24_WriteRegister	24	static
+../Core/Src/nrf24_rx.c:26:6:NRF24RX_Init	8	static
+../Core/Src/nrf24_rx.c:43:9:NRF24_Receive	24	static

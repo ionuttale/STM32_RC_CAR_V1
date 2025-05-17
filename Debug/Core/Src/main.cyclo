@@ -1,0 +1,8 @@
+../Core/Inc/uart.h:21:1:__io_putchar	1
+../Core/Src/main.c:154:5:main	10
+../Core/Src/main.c:274:6:SystemClock_Config	3
+../Core/Src/main.c:314:13:MX_SPI1_Init	2
+../Core/Src/main.c:352:13:MX_TIM2_Init	6
+../Core/Src/main.c:411:13:MX_USART1_UART_Init	2
+../Core/Src/main.c:444:13:MX_GPIO_Init	1
+../Core/Src/main.c:500:6:Error_Handler	1
