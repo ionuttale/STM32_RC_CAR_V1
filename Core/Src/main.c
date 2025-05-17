@@ -83,74 +83,6 @@ static void MX_USART1_UART_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
-#include "main.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-#include "engine.h"
-#include "servo.h"
-#include "uart.h"
-#include "NRF24.h"
-#include "NRF24_reg_addresses.h"
-#include "stm32f1xx_hal.h"
-#include <string.h>
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-#define PLD_SIZE 32
-#define tx 0 // 0 for TX, 1 for RX
-#define rx 1
-#define left 45
-#define right 135
-#define straight 90
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-SPI_HandleTypeDef hspi1;
-
-TIM_HandleTypeDef htim2;
-
-UART_HandleTypeDef huart1;
-
-uint8_t mode = tx;
-int current_angle = straight; // Holds the current servo angle
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_SPI1_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_USART1_UART_Init(void);
-/* USER CODE BEGIN PFP */
-
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 int main(void)
 {
 
@@ -173,6 +105,7 @@ int main(void)
   uint32_t last_send_tick = 0;
   uint8_t temp_msg[PLD_SIZE] = "Temperature: 20C";
   uint8_t hum_msg[PLD_SIZE] = "Humidity: 5%%";
+  uint8_t mode = tx; // 0 for TX, 1 for RX
   
   /* USER CODE END Init */
 
@@ -246,13 +179,13 @@ int main(void)
         HAL_UART_Transmit(&huart1, (uint8_t *)tmp, strlen(tmp), HAL_MAX_DELAY);
 
         if (strcmp((char*)data_R, "FORWARD") == 0) {
-          ENGINE_Set("FORWARD");
+          ENGINE_Set(FORWARD);
           SERVO_SetAngle(straight);
         } else if (strcmp((char*)data_R, "BACKWARD") == 0) {
-          ENGINE_Set("BACKWARD");
+          ENGINE_Set(REVERSE);
           SERVO_SetAngle(straight);
         } else if (strcmp((char*)data_R, "STOP") == 0) {
-          ENGINE_Set("STOP");
+          ENGINE_Set(STOP);
         } else if (strcmp((char*)data_R, "LEFT") == 0) {
           SERVO_SetAngle(left);
         } else if (strcmp((char*)data_R, "RIGHT") == 0) {
