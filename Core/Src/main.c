@@ -55,6 +55,13 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
 
+  ENGINE_Init();
+  ENGINE_Enable();
+  SERVO_Init();
+  SERVO_SetAngle(1);
+
+  printf("Slave started\r\n");
+
   uint8_t rx_data[PLD_SIZE] = {0};
   uint8_t ack_msg[PLD_SIZE] = "25.5, 0";
   uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
@@ -78,13 +85,6 @@ int main(void)
         char msg[40];
         sprintf(msg, "Received: %s\r\n", rx_data);
         HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-        if(strcmp((char*)rx_data, "DATA") == 0) {
-            strcpy(ack_msg, "25.5, 0");  // Toggle LED
-        }
-        else{
-            strcpy(command, (char*)rx_data);
-            command_execute(command);
-        }
         HAL_Delay(10);  // Allow master to switch to RX
         nrf24_stop_listen();  // Go to TX mode
         nrf24_transmit(ack_msg, PLD_SIZE);
@@ -109,9 +109,9 @@ void command_execute(char *command) {
     } else if (strcmp(command, "BACKWARD") == 0) {
         ENGINE_Set(REVERSE);
     } else if (strcmp(command, "LEFT") == 0) {
-        SERVO_SetAngle(70);
+        // SERVO_SetAngle(70);
     } else if (strcmp(command, "RIGHT") == 0) {
-        SERVO_SetAngle(110);
+        // SERVO_SetAngle(110);
     }
 }
 /* USER CODE END 4 */

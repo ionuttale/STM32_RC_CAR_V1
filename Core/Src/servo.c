@@ -27,10 +27,6 @@ void SERVO_Init(){
 
 void SERVO_SetAngle(uint8_t angle){
     // Limit angle to safe range
-    if(angle > 100)
-        angle = 100;
-    if(angle < 80)
-        angle = 80;
 
     printf("Servo angle: %d\r\n", angle);
 

@@ -12,11 +12,11 @@
 #include <stdio.h>
 
 #define EnA    GPIO_PIN_2
-#define EnB    GPIO_PIN_14
-#define IN1    GPIO_PIN_10
-#define IN2    GPIO_PIN_11
+#define EnB    GPIO_PIN_10
+#define IN1    GPIO_PIN_14
+#define IN2    GPIO_PIN_13
 #define IN3    GPIO_PIN_12
-#define IN4    GPIO_PIN_13
+#define IN4    GPIO_PIN_11
 
 #define FORWARD 1
 #define REVERSE 2
