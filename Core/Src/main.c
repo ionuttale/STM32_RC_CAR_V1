@@ -1,10 +1,10 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
+  ****************************************************************************** 
   * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
+  * @brief          : Master program to communicate with Slave using nRF24L01
+  ****************************************************************************** 
+  * @attention 
   *
   * Copyright (c) 2025 STMicroelectronics.
   * All rights reserved.
@@ -13,14 +13,11 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
-  ******************************************************************************
+  ****************************************************************************** 
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
 #include "uart.h"
 #include "NRF24.h"
 #include "NRF24_reg_addresses.h"
@@ -28,90 +25,34 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
 #define PLD_SIZE 32
-#define tx
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
+#define MASTER_MODE
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
-
-// TIM_HandleTypeDef htim2;
-
 UART_HandleTypeDef huart1;
-
-/* USER CODE BEGIN PV */
-int mode = 0; // 0 for TX, 1 for RX
-/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
-/* USER CODE BEGIN PFP */
-
-/* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
 
-uint8_t data_T[PLD_SIZE] = "Hello from STM32!";
-uint8_t data_R[PLD_SIZE] = {0};
-uint8_t ack[PLD_SIZE] = {0};
-
-/* USER CODE END 0 */
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
-//  MX_TIM2_Init();
   MX_USART1_UART_Init();
-  /* USER CODE BEGIN 2 */
 
-  csn_high();
+  uint8_t tx_data[PLD_SIZE] = {0};
+  uint8_t rx_data[PLD_SIZE] = {0};
+  uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
 
   nrf24_init();
   nrf24_tx_pwr(_0dbm);
@@ -119,49 +60,80 @@ int main(void)
   nrf24_set_channel(78);
   nrf24_set_crc(en_crc, _1byte);
   nrf24_pipe_pld_size(0, PLD_SIZE);
-  
-  uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
 
   nrf24_open_tx_pipe(addr);
   nrf24_open_rx_pipe(0, addr);
 
-  #ifdef tx
-   nrf24_stop_listen();
-  #else
-    nrf24_listen();
-  #endif
-
-//  ENGINE_Init();
-//  SERVO_Init();
-
-//  ENGINE_Enable();
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
+  uint32_t last_tx_tick = HAL_GetTick();
   while (1)
   {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-    if (mode == 1) { // RX mode
-      printf("Listening....");
+    
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2) == GPIO_PIN_SET) {
+      printf("bttn_forward pressed\r\n");
+      nrf24_stop_listen();  // Ensure TX mode
+      nrf24_transmit("FORWARD", PLD_SIZE);
       nrf24_listen();
-      if(nrf24_data_available())
-      {
-        nrf24_receive(data_R, sizeof(data_R));
-      }
-      char tmp[40];
-      sprintf(tmp, "Received: %s\n", data_R);
-      HAL_UART_Transmit(&huart1, (uint8_t *)tmp, strlen(tmp), HAL_MAX_DELAY);
-      HAL_Delay(1000);
-    } else { // TX mode
-      nrf24_stop_listen();
-      nrf24_transmit(data_T, sizeof(data_T));
-      HAL_Delay(1000);
+      HAL_Delay(10);
+      HAL_Delay(100);
     }
+
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) == GPIO_PIN_SET) {
+      printf("bttn_backward pressed\r\n");
+      nrf24_stop_listen();  // Ensure TX mode
+      nrf24_transmit("BACKWARD", PLD_SIZE);
+      nrf24_listen();
+      HAL_Delay(10);
+      HAL_Delay(100);
+    }
+
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_6) == GPIO_PIN_SET) {
+      printf("bttn_left pressed\r\n");
+      nrf24_stop_listen();  // Ensure TX mode
+      nrf24_transmit("LEFT", PLD_SIZE);
+      nrf24_listen();
+      HAL_Delay(10);
+      HAL_Delay(100);
+    }
+
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_7) == GPIO_PIN_SET) {
+      printf("bttn_right pressed\r\n");
+      nrf24_stop_listen();  // Ensure TX mode
+      nrf24_transmit("RIGHT", PLD_SIZE);
+      nrf24_listen();
+      HAL_Delay(10);
+      HAL_Delay(100);
+    }
+
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_8) == GPIO_PIN_SET) {
+      printf("bttn_stop pressed\r\n");
+      nrf24_stop_listen();  // Ensure TX mode
+      nrf24_transmit("STOP", PLD_SIZE);
+      nrf24_listen();
+      HAL_Delay(10);
+      HAL_Delay(100);
+    }
+    
+    
+    uint8_t request_data = HAL_GetTick() - last_tx_tick >= 10000 ? 1 : 0;
+    // Only transmit every 30 seconds
+    if (request_data) {
+      HAL_UART_Transmit(&huart1, (uint8_t*)"Requesting data\r\n", strlen("Requesting data\r\n"), HAL_MAX_DELAY);
+      strcpy((char*)tx_data, "DATA");
+      nrf24_stop_listen();  // Ensure TX mode
+      nrf24_transmit(tx_data, PLD_SIZE);
+      last_tx_tick = HAL_GetTick();
+      nrf24_listen();
+      HAL_Delay(10);  // Allow slave to switch and respond
+    }
+    if (nrf24_data_available()) {
+        nrf24_receive(rx_data, PLD_SIZE);
+        char msg[40];
+        sprintf(msg, "Reply: %s\r\n", rx_data);
+        HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+        memset(rx_data, 0, sizeof(rx_data));
+    }
+    HAL_Delay(100);  // Polling interval
   }
-  /* USER CODE END 3 */
 }
 
 /**
