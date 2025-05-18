@@ -1,10 +1,10 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
+  ****************************************************************************** 
   * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
+  * @brief          : Slave program to communicate with Master using nRF24L01
+  ****************************************************************************** 
+  * @attention 
   *
   * Copyright (c) 2025 STMicroelectronics.
   * All rights reserved.
@@ -13,57 +13,29 @@
   * in the root directory of this software component.
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
-  ******************************************************************************
+  ****************************************************************************** 
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
+#include "uart.h"
 #include "engine.h"
 #include "servo.h"
-#include "uart.h"
 #include "NRF24.h"
 #include "NRF24_reg_addresses.h"
 #include "stm32f1xx_hal.h"
 #include <string.h>
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
+#include <stdio.h>
+#include <stdint.h>
 
 /* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
 #define PLD_SIZE 32
-#define tx 0 // 0 for TX, 1 for RX
-#define rx 1
-#define left 45
-#define right 135
-#define straight 90
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
+#define SLAVE_MODE
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
-
-TIM_HandleTypeDef htim2;
-
 UART_HandleTypeDef huart1;
-
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
+TIM_HandleTypeDef htim2;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -71,59 +43,21 @@ static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
-/* USER CODE BEGIN PFP */
-
-/* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-/* USER CODE END 0 */
 
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
-  /* USER CODE BEGIN Init */
-  // uint8_t data_T[PLD_SIZE] = "Hello from STM32!";
-  // uint8_t ack[PLD_SIZE] = {0}; ???
-  
-  uint8_t data_R[PLD_SIZE];
-  // uint8_t ack[PLD_SIZE] = {"Received:"};
-  uint32_t tick = 0;
-  uint32_t last_send_tick = 0;
-  uint8_t temp_msg[PLD_SIZE] = "Temperature: 20C";
-  uint8_t hum_msg[PLD_SIZE] = "Humidity: 5%%";
-  uint8_t mode = tx; // 0 for TX, 1 for RX
-  
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
   SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
-  /* USER CODE BEGIN 2 */
 
-  csn_high();
+  uint8_t rx_data[PLD_SIZE] = {0};
+  uint8_t ack_msg[PLD_SIZE] = "25.5, 0";
+  uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
 
   nrf24_init();
   nrf24_tx_pwr(_0dbm);
@@ -131,79 +65,57 @@ int main(void)
   nrf24_set_channel(78);
   nrf24_set_crc(en_crc, _1byte);
   nrf24_pipe_pld_size(0, PLD_SIZE);
-  
-  uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
-
   nrf24_open_tx_pipe(addr);
   nrf24_open_rx_pipe(0, addr);
+  nrf24_listen();  // Start in RX mode
 
-  if(mode == tx){
-    nrf24_stop_listen();
-  }
-  else{
-    nrf24_listen();
-  }
-  
+  char command[10];
 
-  ENGINE_Init();
-  SERVO_Init();
-
-  ENGINE_Enable();
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
   while (1)
   {
-    tick = HAL_GetTick();
-    if ((tick - last_send_tick) >= 30000) { // Every 30 seconds
-      // Switch to TX mode
-      mode = tx;
-      nrf24_stop_listen();
-      HAL_Delay(5);
-      printf("Transmitting...\r\n");
-      nrf24_transmit(temp_msg, strlen((char*)temp_msg)+1);
-      HAL_Delay(10);
-      nrf24_transmit(hum_msg, strlen((char*)hum_msg)+1);
-      HAL_Delay(10);
-      last_send_tick = tick;
-      // Switch back to RX mode
-      mode = rx;
-      nrf24_listen();
-    }
-    if (mode == rx) {
-      if(nrf24_data_available()) {
-        nrf24_receive(data_R, sizeof(data_R));
-        char tmp[40];
-        sprintf(tmp, "Received: %s\r\n", data_R);
-        HAL_UART_Transmit(&huart1, (uint8_t *)tmp, strlen(tmp), HAL_MAX_DELAY);
-
-        if (strcmp((char*)data_R, "FORWARD") == 0) {
-          ENGINE_Set(FORWARD);
-          SERVO_SetAngle(straight);
-        } else if (strcmp((char*)data_R, "BACKWARD") == 0) {
-          ENGINE_Set(REVERSE);
-          SERVO_SetAngle(straight);
-        } else if (strcmp((char*)data_R, "STOP") == 0) {
-          ENGINE_Set(STOP);
-        } else if (strcmp((char*)data_R, "LEFT") == 0) {
-          SERVO_SetAngle(left);
-        } else if (strcmp((char*)data_R, "RIGHT") == 0) {
-          SERVO_SetAngle(right);
+    if (nrf24_data_available()) {
+        nrf24_receive(rx_data, PLD_SIZE);
+        char msg[40];
+        sprintf(msg, "Received: %s\r\n", rx_data);
+        HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+        if(strcmp((char*)rx_data, "DATA") == 0) {
+            strcpy(ack_msg, "25.5, 0");  // Toggle LED
         }
-        memset(data_R, 0, sizeof(data_R));
-      }
+        else{
+            strcpy(command, (char*)rx_data);
+            command_execute(command);
+        }
+        HAL_Delay(10);  // Allow master to switch to RX
+        nrf24_stop_listen();  // Go to TX mode
+        nrf24_transmit(ack_msg, PLD_SIZE);
+        nrf24_listen();  // Return to RX mode
+        memset(rx_data, 0, sizeof(rx_data));
     }
-    HAL_Delay(10);
   }
-  /* USER CODE END 3 */
 }
-
 
 /**
   * @brief System Clock Configuration
   * @retval None
   */
+
+/* USER CODE BEGIN 4 */
+void command_execute(char *command) {
+    if (strcmp(command, "STOP") == 0) {
+      ENGINE_Set(STOP);
+    } else if (strcmp(command, "FORWARD") == 0) {
+        ENGINE_Set(FORWARD);
+        SERVO_SetAngle(90);
+    } else if (strcmp(command, "BACKWARD") == 0) {
+        ENGINE_Set(REVERSE);
+    } else if (strcmp(command, "LEFT") == 0) {
+        SERVO_SetAngle(70);
+    } else if (strcmp(command, "RIGHT") == 0) {
+        SERVO_SetAngle(110);
+    }
+}
+/* USER CODE END 4 */
+
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -388,8 +300,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|CE_Pin|GPIO_PIN_2|GPIO_PIN_10
-                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14
-                          |DHT11_Pin, GPIO_PIN_RESET);
+                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PA1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
@@ -405,9 +316,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : CE_Pin PB2 PB10 PB11
-                           PB12 PB13 PB14 DHT11_Pin */
+                           PB12 PB13 */
   GPIO_InitStruct.Pin = CE_Pin|GPIO_PIN_2|GPIO_PIN_10|GPIO_PIN_11
-                          |GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|DHT11_Pin;
+                          |GPIO_PIN_12|GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
