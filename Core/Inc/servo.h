@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #define per_deg 5.55
+#define calib 0
 
 void SERVO_Init(void);
 

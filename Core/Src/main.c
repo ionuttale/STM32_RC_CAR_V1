@@ -17,6 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include "stm32f1xx.h"
+#include "stm32f1xx_hal_conf.h"
 #include "main.h"
 #include "uart.h"
 #include "engine.h"
@@ -37,12 +39,18 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart1;
 TIM_HandleTypeDef htim2;
 
+uint8_t rx_data[PLD_SIZE] = {0};
+uint8_t ack_msg[PLD_SIZE] = "25.5, 0";
+uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
+
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
+// Prototype for command_execute to match the implementation
+void command_execute(char *command);
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -56,15 +64,11 @@ int main(void)
   MX_USART1_UART_Init();
 
   ENGINE_Init();
+  HAL_Delay(500);
   ENGINE_Enable();
   SERVO_Init();
-  SERVO_SetAngle(1);
 
   printf("Slave started\r\n");
-
-  uint8_t rx_data[PLD_SIZE] = {0};
-  uint8_t ack_msg[PLD_SIZE] = "25.5, 0";
-  uint8_t addr[5] = {0x10, 0x21, 0x32, 0x43, 0x54};
 
   nrf24_init();
   nrf24_tx_pwr(_0dbm);
@@ -82,14 +86,24 @@ int main(void)
   {
     if (nrf24_data_available()) {
         nrf24_receive(rx_data, PLD_SIZE);
+        // Ensure rx_data is null-terminated for string operations
+        rx_data[PLD_SIZE - 1] = '\0';
+        // Copy only the first word/command (up to 9 chars) to command buffer
+        strncpy(command, (char*)rx_data, sizeof(command) - 1);
+        command[sizeof(command) - 1] = '\0';
         char msg[40];
-        sprintf(msg, "Received: %s\r\n", rx_data);
-        HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-        HAL_Delay(10);  // Allow master to switch to RX
-        nrf24_stop_listen();  // Go to TX mode
-        nrf24_transmit(ack_msg, PLD_SIZE);
-        nrf24_listen();  // Return to RX mode
+        sprintf(msg, "Received: %s\r\n", command);
+        command_execute(command);
+        HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);  // Allow master to switch to RX
+        // Go to TX mode
+        if(strncmp(command, "DATA", 4) == 0){
+         HAL_Delay(10);
+         nrf24_stop_listen();
+         nrf24_transmit(ack_msg, PLD_SIZE);
+         nrf24_listen();  // Return to RX mode
+        }
         memset(rx_data, 0, sizeof(rx_data));
+        memset(command, 0, sizeof(command));
     }
   }
 }
@@ -100,22 +114,38 @@ int main(void)
   */
 
 /* USER CODE BEGIN 4 */
-void command_execute(char *command) {
+void command_execute(char command[10]) {
+	printf("Comanda primita: %s", command);
     if (strcmp(command, "STOP") == 0) {
+    	printf("STOP executing\r\n");
       ENGINE_Set(STOP);
     } else if (strcmp(command, "FORWARD") == 0) {
+        printf("FORWARD executing\r\n");
         ENGINE_Set(FORWARD);
+        HAL_Delay(100);
         SERVO_SetAngle(90);
+        HAL_Delay(100);
     } else if (strcmp(command, "BACKWARD") == 0) {
+        printf("BACKWARD executing\r\n");
         ENGINE_Set(REVERSE);
+        HAL_Delay(100);
+        SERVO_SetAngle(90);
+        HAL_Delay(100);
     } else if (strcmp(command, "LEFT") == 0) {
-        // SERVO_SetAngle(70);
+        printf("LEFT executing\r\n");
+        SERVO_SetAngle(50);
+        HAL_Delay(100);
     } else if (strcmp(command, "RIGHT") == 0) {
-        // SERVO_SetAngle(110);
+        printf("RIGHT executing\r\n");
+        SERVO_SetAngle(130);
+        HAL_Delay(100);
     }
 }
-/* USER CODE END 4 */
 
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -300,7 +330,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|CE_Pin|GPIO_PIN_2|GPIO_PIN_10
-                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13, GPIO_PIN_RESET);
+                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14
+                          |DHT11_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PA1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
@@ -308,17 +339,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : CE_Pin PB2 PB10 PB11
-                           PB12 PB13 */
-  GPIO_InitStruct.Pin = CE_Pin|GPIO_PIN_2|GPIO_PIN_10|GPIO_PIN_11
-                          |GPIO_PIN_12|GPIO_PIN_13;
+  /*Configure GPIO pins : PB0 CE_Pin PB2 PB10
+                           PB11 PB12 PB13 PB14
+                           DHT11_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|CE_Pin|GPIO_PIN_2|GPIO_PIN_10
+                          |GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14
+                          |DHT11_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
@@ -332,10 +358,6 @@ static void MX_GPIO_Init(void)
 
   /* USER CODE END MX_GPIO_Init_2 */
 }
-
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /**
   * @brief  This function is executed in case of error occurrence.
